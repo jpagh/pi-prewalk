@@ -29,7 +29,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && node scripts/verify.mjs"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@earendil-works/pi-ai": "^0.83.0",
     "@earendil-works/pi-coding-agent": "^0.83.0",
+    "jiti": "2.7.0",
     "typescript": "^5.9.0"
   }
 }

@@ -54,8 +54,10 @@ If the default target (`opencode/glm-5.2`) has no configured API key, prewalk fa
 
 ```bash
 npm install
-npm run typecheck
+npm run verify
 ```
+
+`verify` runs the typecheck (`tsc --noEmit`) plus headless functional checks (`scripts/verify.mjs`): the extension is loaded with [jiti](https://github.com/unjs/jiti) — the same loader pi uses — and driven through a mock `ExtensionAPI` to assert the full arm → todo-gate → model-switch → context-scrub flow, with no pi binary, models, or API keys needed. The same command runs in CI (`.github/workflows/verify.yml`) and gates every publish (`.github/workflows/publish.yml`).
 
 The extension is plain TypeScript loaded by pi via [jiti](https://github.com/unjs/jiti) — no build step. Pi's core packages (`@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`) are `peerDependencies`; they are provided by pi at runtime and installed locally only for typechecking.
 
