@@ -59,6 +59,23 @@ npm run typecheck
 
 The extension is plain TypeScript loaded by pi via [jiti](https://github.com/unjs/jiti) — no build step. Pi's core packages (`@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`) are `peerDependencies`; they are provided by pi at runtime and installed locally only for typechecking.
 
+## Releasing
+
+Publishing is done from GitHub Actions via [npm trusted publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no npm tokens stored anywhere. Pushing a version tag publishes to npm with a provenance attestation:
+
+```bash
+npm version patch        # or minor / major — bumps, commits, tags vX.Y.Z
+git push --follow-tags   # the v* tag triggers .github/workflows/publish.yml
+```
+
+One-time setup (see npm's docs — the *initial* version of a package cannot be published via OIDC, [npm/cli#8544](https://github.com/npm/cli/issues/8544)):
+
+1. Publish v1.0.0 manually: `npm login && npm publish`
+2. Configure the trusted publisher at https://www.npmjs.com/package/pi-prewalk/access → **Trusted Publisher** → GitHub Actions:
+   - Organization/user: `lukeramsden`, Repository: `pi-prewalk`
+   - Workflow filename: `publish.yml`, Allowed actions: `npm publish`
+3. Optionally set **Publishing access** to "Require two-factor authentication and disallow tokens".
+
 ## License
 
 MIT
