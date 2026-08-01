@@ -1,6 +1,6 @@
 {
   "name": "pi-prewalk",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Prewalk extension for the pi coding agent: let a strong model do the planning, then hand mechanical implementation off to a fast/cheap model (todo-gated, one-way switch).",
   "license": "MIT",
   "author": "lukeramsden",
