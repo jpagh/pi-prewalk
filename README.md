@@ -35,20 +35,20 @@ pi install git:github.com/lukeramsden/pi-prewalk
 ## Usage
 
 ```bash
-pi --prewalk                     # arm at startup, default target (GLM-5.2 on baseten)
+pi --prewalk                     # arm at startup, default target (GLM-5.2 on opencode)
 pi --prewalk-into anthropic/...  # arm at startup, explicit target
 ```
 
 Or inside a session:
 
 ```
-/prewalk                         # arm now, default target (GLM-5.2 on baseten)
+/prewalk                         # arm now, default target (GLM-5.2 on opencode)
 /prewalk <provider/model|model>  # arm now, explicit target
 /prewalk off                     # disarm
 /prewalk status                  # show current state
 ```
 
-If the default target (`baseten/zai-org/GLM-5.2`) has no configured API key, prewalk falls back to the cheapest available model with a warning.
+If the default target (`opencode/glm-5.2`) has no configured API key, prewalk falls back to the cheapest available model with a warning.
 
 ## Development
 
