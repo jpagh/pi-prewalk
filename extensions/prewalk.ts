@@ -29,9 +29,9 @@
  *   pi -e npm:pi-prewalk
  *
  * Usage:
- *   pi --prewalk                     # arm at startup, default target (GLM-5.2 on opencode)
+ *   pi --prewalk                     # arm at startup, default target (gpt-5.6-luna on openai-codex, high thinking)
  *   pi --prewalk-into anthropic/...  # arm at startup, explicit target
- *   /prewalk                         # arm now, default target (GLM-5.2 on opencode)
+ *   /prewalk                         # arm now, default target (gpt-5.6-luna on openai-codex, high thinking)
  *   /prewalk <provider/model|model>  # arm now, explicit target
  *   /prewalk off                     # disarm
  *   /prewalk status                  # show current state
@@ -60,10 +60,10 @@ const PREWALK_ACTION_TOOLS: Record<string, true> = {
 
 /**
  * Default target model when none is given (upstream's `@smol` role has no
- * analogue here). GLM-5.2 on opencode — a fast/cheap implementation model.
+ * analogue here). gpt-5.6-luna on openai-codex — a fast/cheap implementation model.
  * Falls back to the cheapest available model if this one has no configured key.
  */
-const DEFAULT_PREWALK_TARGET = { provider: "opencode", id: "glm-5.2" };
+const DEFAULT_PREWALK_TARGET = { provider: "openai-codex", id: "gpt-5.6-luna" };
 
 const PREWALK_PLAN_PROMPT = `Stop and write the complete plan in your NEXT reply — before any further exploration. You have already seen enough to commit to a plan; do not defer this.
 
@@ -110,7 +110,8 @@ function totalCost(model: Model<Api>): number {
 
 /**
  * Resolve the target model. With a spec (`provider/id` or a bare `id`) find the
- * matching available model. Without a spec, default to GLM-5.2 on opencode; if
+ * matching available model. Without a spec, default to gpt-5.6-luna on
+ * openai-codex; if
  * that model has no configured key, fall back to the cheapest available model
  * other than the current one (preferring models with a known non-zero price so
  * a mispriced/free stub is not chosen ahead of a real cheap model).
@@ -246,7 +247,7 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 		if (resolved.warning) {
 			ctx.ui.notify(`Prewalk: ${resolved.warning}`, "warning");
 		}
-		arm(resolved.model, undefined, ctx);
+		arm(resolved.model, spec === undefined ? "high" : undefined, ctx);
 	});
 
 	pi.registerCommand("prewalk", {
@@ -281,7 +282,7 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 			if (resolved.warning) {
 				ctx.ui.notify(`Prewalk: ${resolved.warning}`, "warning");
 			}
-			arm(resolved.model, undefined, ctx);
+			arm(resolved.model, arg.length === 0 ? "high" : undefined, ctx);
 		},
 	});
 

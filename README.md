@@ -16,39 +16,29 @@ Prewalk is a one-way switch, armed either at startup or mid-session. Once armed:
 
 ## Install
 
-```bash
-pi install npm:pi-prewalk
-```
-
-Or try it for a single run without installing:
+From git:
 
 ```bash
-pi -e npm:pi-prewalk
-```
-
-From git instead of npm:
-
-```bash
-pi install git:github.com/lukeramsden/pi-prewalk
+pi install git:github.com/jpagh/pi-prewalk
 ```
 
 ## Usage
 
 ```bash
-pi --prewalk                     # arm at startup, default target (GLM-5.2 on opencode)
+pi --prewalk                     # arm at startup, default target (gpt-5.6-luna on openai-codex, high thinking)
 pi --prewalk-into anthropic/...  # arm at startup, explicit target
 ```
 
 Or inside a session:
 
 ```
-/prewalk                         # arm now, default target (GLM-5.2 on opencode)
+/prewalk                         # arm now, default target (gpt-5.6-luna on openai-codex, high thinking)
 /prewalk <provider/model|model>  # arm now, explicit target
 /prewalk off                     # disarm
 /prewalk status                  # show current state
 ```
 
-If the default target (`opencode/glm-5.2`) has no configured API key, prewalk falls back to the cheapest available model with a warning.
+If the default target (`openai-codex/gpt-5.6-luna`) has no configured API key, prewalk falls back to the cheapest available model with a warning.
 
 ## Development
 

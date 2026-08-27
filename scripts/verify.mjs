@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { createJiti } from "jiti";
 
-const GLM = { provider: "opencode", id: "glm-5.2", cost: { input: 0.5, output: 2 } };
+const LUNA = { provider: "openai-codex", id: "gpt-5.6-luna", cost: { input: 0.5, output: 2 } };
 const CLAUDE = { provider: "anthropic", id: "claude-opus-4-8", cost: { input: 15, output: 75 } };
 
 let passed = 0;
@@ -61,7 +61,7 @@ function makeHarness({ setModelSucceeds = true } = {}) {
 	};
 	const ctx = {
 		model: CLAUDE,
-		modelRegistry: { getAvailable: async () => [CLAUDE, GLM] },
+		modelRegistry: { getAvailable: async () => [CLAUDE, LUNA] },
 		ui: { notify: (msg, level) => notices.push({ msg, level }) },
 	};
 	return { flags, commands, events, sent, notices, setModelCalls, thinkingLevels, pi, ctx };
@@ -119,9 +119,9 @@ check("status reports not armed before arming", () => {
 });
 
 await prewalk("");
-check("arm resolves the default target opencode/glm-5.2", () => {
+check("arm resolves the default target openai-codex/gpt-5.6-luna", () => {
 	assert.ok(
-		h.notices.some((n) => n.msg.startsWith("Prewalk: armed for opencode/glm-5.2")),
+		h.notices.some((n) => n.msg.startsWith("Prewalk: armed for openai-codex/gpt-5.6-luna")),
 		`expected armed notice, got: ${h.notices.map((n) => n.msg).join(" | ")}`,
 	);
 });
@@ -147,11 +147,15 @@ check("todo-only turn does not trigger the switch (gate waits for edit/write)", 
 
 await turnEnd(["edit"]);
 check("first edit after the todo list switches to the target model", () => {
-	assert.deepEqual(h.setModelCalls, [GLM]);
+	assert.deepEqual(h.setModelCalls, [LUNA]);
+});
+
+check("default target switches with high thinking", () => {
+	assert.deepEqual(h.thinkingLevels, ["high"]);
 });
 
 check("switch notifies and steers in the verification checklist", () => {
-	assert.ok(h.notices.some((n) => n.msg === "Prewalk: switched to opencode/glm-5.2 after first edit call."));
+	assert.ok(h.notices.some((n) => n.msg === "Prewalk: switched to openai-codex/gpt-5.6-luna after first edit call."));
 	const checklist = h.sent.find((s) => s.message.customType === "prewalk-checklist");
 	assert.ok(checklist, "no checklist nudge sent");
 	assert.equal(checklist.opts.deliverAs, "steer");
@@ -205,7 +209,7 @@ factory(f.pi);
 f.flags.get("prewalk").value = true;
 await f.events.get("session_start")({}, f.ctx);
 check("--prewalk arms at session_start with the default target", () => {
-	assert.ok(f.notices.some((n) => n.msg.startsWith("Prewalk: armed for opencode/glm-5.2")));
+	assert.ok(f.notices.some((n) => n.msg.startsWith("Prewalk: armed for openai-codex/gpt-5.6-luna")));
 });
 
 // --- setModel failure path ----------------------------------------------------
@@ -224,7 +228,7 @@ await fail.events.get("turn_end")(
 check("failed setModel warns and stays on the current model", () => {
 	assert.ok(
 		fail.notices.some(
-			(n) => n.msg === "Prewalk: no API key for opencode/glm-5.2; staying on current model." && n.level === "warning",
+			(n) => n.msg === "Prewalk: no API key for openai-codex/gpt-5.6-luna; staying on current model." && n.level === "warning",
 		),
 	);
 	assert.ok(!fail.sent.some((s) => s.message.customType === "prewalk-checklist"));
