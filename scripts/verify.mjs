@@ -150,8 +150,8 @@ check("first edit after the todo list switches to the target model", () => {
 	assert.deepEqual(h.setModelCalls, [LUNA]);
 });
 
-check("default target switches with high thinking", () => {
-	assert.deepEqual(h.thinkingLevels, ["high"]);
+check("default target switches with xhigh thinking", () => {
+	assert.deepEqual(h.thinkingLevels, ["xhigh"]);
 });
 
 check("switch notifies and steers in the verification checklist", () => {

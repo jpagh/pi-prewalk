@@ -29,9 +29,9 @@
  *   pi -e npm:pi-prewalk
  *
  * Usage:
- *   pi --prewalk                     # arm at startup, default target (gpt-5.6-luna on openai-codex, high thinking)
+ *   pi --prewalk                     # arm at startup, default target (gpt-5.6-luna on openai-codex, xhigh thinking)
  *   pi --prewalk-into anthropic/...  # arm at startup, explicit target
- *   /prewalk                         # arm now, default target (gpt-5.6-luna on openai-codex, high thinking)
+ *   /prewalk                         # arm now, default target (gpt-5.6-luna on openai-codex, xhigh thinking)
  *   /prewalk <provider/model|model>  # arm now, explicit target
  *   /prewalk off                     # disarm
  *   /prewalk status                  # show current state
@@ -247,7 +247,7 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 		if (resolved.warning) {
 			ctx.ui.notify(`Prewalk: ${resolved.warning}`, "warning");
 		}
-		arm(resolved.model, spec === undefined ? "high" : undefined, ctx);
+		arm(resolved.model, spec === undefined ? "xhigh" : undefined, ctx);
 	});
 
 	pi.registerCommand("prewalk", {
@@ -282,7 +282,7 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 			if (resolved.warning) {
 				ctx.ui.notify(`Prewalk: ${resolved.warning}`, "warning");
 			}
-			arm(resolved.model, arg.length === 0 ? "high" : undefined, ctx);
+			arm(resolved.model, arg.length === 0 ? "xhigh" : undefined, ctx);
 		},
 	});
 
