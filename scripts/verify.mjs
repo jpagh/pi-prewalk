@@ -37,7 +37,7 @@ function check(name, fn) {
  * Build a fresh extension instance plus mocks. Captures everything the
  * extension does through pi/ctx so tests can assert on it.
  */
-function makeHarness({ setModelSucceeds = true } = {}) {
+function makeHarness({ setModelSucceeds = true, scopedModels = [LUNA], availableModels = [CLAUDE, LUNA] } = {}) {
 	const flags = new Map();
 	const commands = new Map();
 	const events = new Map();
@@ -61,7 +61,8 @@ function makeHarness({ setModelSucceeds = true } = {}) {
 	};
 	const ctx = {
 		model: CLAUDE,
-		modelRegistry: { getAvailable: async () => [CLAUDE, LUNA] },
+		scopedModels: scopedModels.map((model) => ({ model })),
+		modelRegistry: { getAvailable: async () => availableModels },
 		ui: { notify: (msg, level) => notices.push({ msg, level }) },
 	};
 	return { flags, commands, events, sent, notices, setModelCalls, thinkingLevels, pi, ctx };
@@ -119,7 +120,7 @@ check("status reports not armed before arming", () => {
 });
 
 await prewalk("");
-check("arm resolves the default target openai-codex/gpt-5.6-luna", () => {
+check("arm resolves the first scoped target openai-codex/gpt-5.6-luna", () => {
 	assert.ok(
 		h.notices.some((n) => n.msg.startsWith("Prewalk: armed for openai-codex/gpt-5.6-luna")),
 		`expected armed notice, got: ${h.notices.map((n) => n.msg).join(" | ")}`,
@@ -178,6 +179,33 @@ check("after the switch, plan/continue nudges are scrubbed from context (checkli
 
 // --- Command flow: disarm, explicit spec, unknown spec ----------------------
 
+const firstScoped = { provider: "google", id: "gemini-flash" };
+const scoped = makeHarness({ scopedModels: [firstScoped, LUNA], availableModels: [CLAUDE, LUNA, firstScoped] });
+factory(scoped.pi);
+await scoped.commands.get("prewalk").handler("", scoped.ctx);
+check("default target is the first scoped model, not catalog order or price", () => {
+	assert.ok(scoped.notices.some((n) => n.msg.startsWith("Prewalk: armed for google/gemini-flash")));
+});
+
+const retargeted = makeHarness({ availableModels: [CLAUDE, LUNA, firstScoped] });
+factory(retargeted.pi);
+await retargeted.commands.get("prewalk").handler("", retargeted.ctx);
+await retargeted.commands.get("prewalk").handler("gemini-flash", retargeted.ctx);
+check("a short model ID retargets an armed prewalk", () => {
+	assert.ok(retargeted.notices.some((n) => n.msg === "Prewalk: target changed to google/gemini-flash — waiting for the first edit/write."));
+});
+await retargeted.events.get("turn_end")(
+	{ message: { role: "assistant" }, toolResults: [{ isError: false, toolName: "todo" }] },
+	retargeted.ctx,
+);
+await retargeted.events.get("turn_end")(
+	{ message: { role: "assistant" }, toolResults: [{ isError: false, toolName: "edit" }] },
+	retargeted.ctx,
+);
+check("retargeting switches to the newly chosen model", () => {
+	assert.deepEqual(retargeted.setModelCalls, [firstScoped]);
+});
+
 const d = makeHarness();
 factory(d.pi);
 await d.commands.get("prewalk").handler("", d.ctx);
@@ -208,7 +236,7 @@ const f = makeHarness();
 factory(f.pi);
 f.flags.get("prewalk").value = true;
 await f.events.get("session_start")({}, f.ctx);
-check("--prewalk arms at session_start with the default target", () => {
+check("--prewalk arms at session_start with the first scoped target", () => {
 	assert.ok(f.notices.some((n) => n.msg.startsWith("Prewalk: armed for openai-codex/gpt-5.6-luna")));
 });
 

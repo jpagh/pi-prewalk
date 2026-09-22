@@ -25,20 +25,20 @@ pi install git:github.com/jpagh/pi-prewalk
 ## Usage
 
 ```bash
-pi --prewalk                     # arm at startup, default target (gpt-5.6-luna on openai-codex, xhigh thinking)
+pi --prewalk                     # arm at startup, first scoped model (xhigh thinking)
 pi --prewalk-into anthropic/...  # arm at startup, explicit target
 ```
 
 Or inside a session:
 
 ```
-/prewalk                         # arm now, default target (gpt-5.6-luna on openai-codex, xhigh thinking)
-/prewalk <provider/model|model>  # arm now, explicit target
+/prewalk                         # arm now, first scoped model (xhigh thinking)
+/prewalk <model-id>              # arm or retarget (bare ID works; provider/model also works)
 /prewalk off                     # disarm
 /prewalk status                  # show current state
 ```
 
-If the default target (`openai-codex/gpt-5.6-luna`) has no configured API key, prewalk falls back to the cheapest available model with a warning.
+Without an explicit target, prewalk switches to the first model in Pi's scoped models list (the order shown by `/scoped-models`). If no scoped models are configured, it uses `openai-codex/gpt-5.6-luna`, falling back to the cheapest available model with a warning if that default is unavailable. While armed, run `/prewalk <model-id>` to change the target; a bare model ID is enough when it identifies a model.
 
 ## Development
 

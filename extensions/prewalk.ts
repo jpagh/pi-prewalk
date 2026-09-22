@@ -29,9 +29,9 @@
  *   pi -e npm:pi-prewalk
  *
  * Usage:
- *   pi --prewalk                     # arm at startup, default target (gpt-5.6-luna on openai-codex, xhigh thinking)
+ *   pi --prewalk                     # arm at startup, first scoped model (xhigh thinking)
  *   pi --prewalk-into anthropic/...  # arm at startup, explicit target
- *   /prewalk                         # arm now, default target (gpt-5.6-luna on openai-codex, xhigh thinking)
+ *   /prewalk                         # arm now, first scoped model (xhigh thinking)
  *   /prewalk <provider/model|model>  # arm now, explicit target
  *   /prewalk off                     # disarm
  *   /prewalk status                  # show current state
@@ -58,11 +58,7 @@ const PREWALK_ACTION_TOOLS: Record<string, true> = {
 	write: true,
 };
 
-/**
- * Default target model when none is given (upstream's `@smol` role has no
- * analogue here). gpt-5.6-luna on openai-codex — a fast/cheap implementation model.
- * Falls back to the cheapest available model if this one has no configured key.
- */
+/** Legacy fallback when no scoped models are configured. */
 const DEFAULT_PREWALK_TARGET = { provider: "openai-codex", id: "gpt-5.6-luna" };
 
 const PREWALK_PLAN_PROMPT = `Stop and write the complete plan in your NEXT reply — before any further exploration. You have already seen enough to commit to a plan; do not defer this.
@@ -110,11 +106,11 @@ function totalCost(model: Model<Api>): number {
 
 /**
  * Resolve the target model. With a spec (`provider/id` or a bare `id`) find the
- * matching available model. Without a spec, default to gpt-5.6-luna on
- * openai-codex; if
- * that model has no configured key, fall back to the cheapest available model
- * other than the current one (preferring models with a known non-zero price so
- * a mispriced/free stub is not chosen ahead of a real cheap model).
+ * matching available model. Without a spec, prefer the first Pi scoped model.
+ * If no scoped models are configured, default to gpt-5.6-luna on openai-codex;
+ * if that model has no configured key, fall back to the cheapest available
+ * model other than the current one (preferring models with a known non-zero
+ * price so a mispriced/free stub is not chosen ahead of a real cheap model).
  */
 async function resolveTarget(
 	ctx: ExtensionContext,
@@ -146,6 +142,11 @@ async function resolveTarget(
 			return { error: `No available model matches "${spec}"` };
 		}
 		return { model: match };
+	}
+
+	const scopedTarget = ctx.scopedModels?.[0]?.model;
+	if (scopedTarget) {
+		return { model: scopedTarget as Model<Api> };
 	}
 
 	const current = ctx.model as Model<Api> | undefined;
@@ -211,13 +212,21 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 	}
 
 	/**
-	 * Arm prewalk and immediately steer the plan nudge — an explicit arm means
-	 * "start this now". A no-op with a notice when already armed.
+	 * Arm prewalk and immediately steer the plan nudge. If already armed, an
+	 * explicit new target replaces the old one without restarting the plan.
 	 */
 	function arm(target: Model<Api>, thinkingLevel: ThinkingLevel | undefined, ctx: ExtensionContext): void {
 		if (armed) {
+			if (modelsAreEqual(armed.target, target)) {
+				ctx.ui.notify(
+					`Prewalk: already armed for ${modelLabel(armed.target)}, waiting for the first edit/write.`,
+					"info",
+				);
+				return;
+			}
+			armed = { ...armed, target };
 			ctx.ui.notify(
-				`Prewalk: already armed for ${modelLabel(armed.target)}, waiting for the first edit/write.`,
+				`Prewalk: target changed to ${modelLabel(target)} — waiting for the first edit/write.`,
 				"info",
 			);
 			return;
