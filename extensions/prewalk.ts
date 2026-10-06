@@ -18,6 +18,9 @@
  *      session switches to the fast target model and a verification checklist
  *      is steered in. The plan nudge is scrubbed from the LLM context at the
  *      switch (the fast model inherits the plan, not the nudge).
+ *   4. If the switch trips the Codex "model is not enabled" error (the cached
+ *      WebSocket is still bound to the previous model), prewalk recovers with
+ *      one automatic continuation so the switch is seamless.
  *
  * Bash is deliberately NOT a trigger tool (it doubles as exploration), and the
  * `todo` call itself is deliberately NOT a trigger (firing there hands the fast
@@ -46,6 +49,8 @@ const PREWALK_PLAN_MESSAGE_TYPE = "prewalk-plan";
 const PREWALK_CONTINUE_MESSAGE_TYPE = "prewalk-continue";
 /** Hidden "verify before finishing" checklist steered in at the switch. */
 const PREWALK_CHECKLIST_MESSAGE_TYPE = "prewalk-checklist";
+/** Hidden nudge that recovers from a Codex transport error after the switch. */
+const PREWALK_RECOVER_MESSAGE_TYPE = "prewalk-recover";
 
 /**
  * Tools whose first successful call triggers the switch — once the todo gate
@@ -76,6 +81,8 @@ Then, only once the plan above is complete, in the SAME reply, capture it as a t
 This is a checkpoint, not a final answer: do not end your turn on the plan alone — after recording the todo list, continue the task; do not stop here.`;
 
 const PREWALK_CONTINUE_PROMPT = `Continue the task now — do not end your turn here.`;
+
+const PREWALK_RECOVER_PROMPT = `Continue the task now — the previous request failed before producing output; pick up where you left off.`;
 
 const PREWALK_CHECKLIST_PROMPT = `Before you consider this task finished, verify:
 
@@ -182,6 +189,9 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 	let planInjected = false;
 	let continuePending = false;
 	let todoSeen = false;
+	// Set on a successful switch; cleared at the next turn boundary. Used to
+	// recover once from the Codex error that a mid-session switch can trigger.
+	let recoveryPending = false;
 
 	pi.registerFlag("prewalk", {
 		description: "Arm prewalk: switch to a fast/cheap model at the first edit/write (todo-gated)",
@@ -198,6 +208,7 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 		planInjected = false;
 		continuePending = false;
 		todoSeen = false;
+		recoveryPending = false;
 	}
 
 	function steerPlanNudge(): void {
@@ -297,9 +308,35 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 
 	// One-way switch advanced at each completed assistant-turn boundary.
 	pi.on("turn_end", async (event, ctx) => {
-		if (!armed) return;
 		const message = event.message;
 		if (!message || message.role !== "assistant") return;
+
+		// The first request after a mid-session switch can be rejected by the
+		// Codex backend ("model ... is not enabled") because the cached
+		// WebSocket is still bound to the previous model. Pi classifies that as
+		// a non-transport error and does not retry, so recover with a single
+		// continuation: the failed connection was already torn down, so the
+		// retry reconnects for the new model.
+		if (recoveryPending) {
+			recoveryPending = false;
+			if (message.stopReason === "error" && /not enabled/i.test(message.errorMessage ?? "")) {
+				ctx.ui.notify("Prewalk: recovered from a Codex model-switch error.", "info");
+				pi.sendMessage(
+					{
+						customType: PREWALK_RECOVER_MESSAGE_TYPE,
+						content: PREWALK_RECOVER_PROMPT,
+						display: false,
+					},
+					{ deliverAs: "steer" },
+				);
+				// `turn_end` handlers gained a boundary result in pi 1.0; this fork's
+				// pinned type packages (0.83) still type them as returning void. Cast so
+				// it compiles against both — the runtime receives the object.
+				return { continue: true } as unknown as void;
+			}
+		}
+
+		if (!armed) return;
 
 		const toolResults = event.toolResults ?? [];
 		if (toolResults.some((result) => !result.isError && result.toolName === "todo")) {
@@ -361,6 +398,7 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 			pi.setThinkingLevel(armed.thinkingLevel);
 		}
 		armed = undefined;
+		recoveryPending = true;
 		ctx.ui.notify(`Prewalk: switched to ${modelLabel(target)} after first ${action.toolName} call.`, "info");
 		pi.sendMessage(
 			{
@@ -372,10 +410,10 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 		);
 	});
 
-	// The plan and continue nudges are one-shot steers meant to be seen only
-	// during the planning phase, while prewalk is armed and waiting for the
-	// first edit/write. Once the switch fires (or prewalk otherwise stands
-	// down) `armed` is cleared, so from then on scrub both from the LLM context
+	// The plan, continue, and recovery nudges are one-shot steers meant to be
+	// seen only during the run they were injected for. Once the switch fires (or
+	// prewalk otherwise stands down) `armed` is cleared, so from then on scrub
+	// them from the LLM context
 	// — the model inherits the plan they produced, not the nudges themselves
 	// (the verification checklist is deliberately left in place). Keying off
 	// `armed` (rather than a separate flag) keeps the scrub durable across
@@ -387,7 +425,9 @@ export default function prewalkExtension(pi: ExtensionAPI) {
 			(m) =>
 				!(
 					m.role === "custom" &&
-					(m.customType === PREWALK_PLAN_MESSAGE_TYPE || m.customType === PREWALK_CONTINUE_MESSAGE_TYPE)
+					(m.customType === PREWALK_PLAN_MESSAGE_TYPE ||
+						m.customType === PREWALK_CONTINUE_MESSAGE_TYPE ||
+						m.customType === PREWALK_RECOVER_MESSAGE_TYPE)
 				),
 		);
 		if (messages.length === event.messages.length) return;

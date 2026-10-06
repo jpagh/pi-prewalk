@@ -262,5 +262,68 @@ check("failed setModel warns and stays on the current model", () => {
 	assert.ok(!fail.sent.some((s) => s.message.customType === "prewalk-checklist"));
 });
 
+// --- Codex model-switch recovery ---------------------------------------------
+
+const CODEX_NOT_ENABLED = {
+	role: "assistant",
+	stopReason: "error",
+	errorMessage: "Codex error: model 'gpt-6.1-sol' is not enabled in responses api",
+};
+
+async function armAndSwitch(hh) {
+	factory(hh.pi);
+	await hh.commands.get("prewalk").handler("", hh.ctx);
+	await hh.events.get("turn_end")(
+		{ message: { role: "assistant" }, toolResults: [{ isError: false, toolName: "todo" }] },
+		hh.ctx,
+	);
+	await hh.events.get("turn_end")(
+		{ message: { role: "assistant" }, toolResults: [{ isError: false, toolName: "edit" }] },
+		hh.ctx,
+	);
+}
+
+const rec = makeHarness();
+await armAndSwitch(rec);
+const recResult = await rec.events.get("turn_end")({ message: CODEX_NOT_ENABLED, toolResults: [] }, rec.ctx);
+check("a Codex 'not enabled' error right after the switch recovers with one continuation", () => {
+	assert.equal(recResult?.continue, true);
+	const recover = rec.sent.find((s) => s.message.customType === "prewalk-recover");
+	assert.ok(recover, "no recovery nudge sent");
+	assert.equal(recover.opts.deliverAs, "steer");
+	assert.equal(recover.message.display, false);
+	assert.ok(rec.notices.some((n) => n.msg === "Prewalk: recovered from a Codex model-switch error."));
+});
+
+const recAgain = await rec.events.get("turn_end")({ message: CODEX_NOT_ENABLED, toolResults: [] }, rec.ctx);
+check("recovery is one-shot (a second error does not recover again)", () => {
+	assert.equal(recAgain, undefined);
+	assert.equal(rec.sent.filter((s) => s.message.customType === "prewalk-recover").length, 1);
+});
+
+const recClean = makeHarness();
+await armAndSwitch(recClean);
+const cleanResult = await recClean.events.get("turn_end")(
+	{ message: { role: "assistant", stopReason: "endTurn" }, toolResults: [] },
+	recClean.ctx,
+);
+check("a normal turn after the switch does not trigger recovery", () => {
+	assert.equal(cleanResult, undefined);
+	assert.ok(!recClean.sent.some((s) => s.message.customType === "prewalk-recover"));
+});
+
+const recoverScrub = await rec.events.get("context")({
+	messages: [
+		{ role: "custom", customType: "prewalk-recover", content: "r" },
+		{ role: "user", content: "hi" },
+	],
+});
+check("the recovery nudge is scrubbed from context", () => {
+	assert.deepEqual(
+		recoverScrub.messages.map((m) => m.customType ?? m.role),
+		["user"],
+	);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

@@ -11,6 +11,7 @@ Prewalk is a one-way switch, armed either at startup or mid-session. Once armed:
 1. **Plan nudge** — a hidden deep-plan prompt is steered in so the strong model commits to a complete plan and seeds a todo list before touching code.
 2. **Continue safety net** — one extra turn is re-armed after a text-only reply, so a plan-only turn never ends the run with no code written.
 3. **The switch** — once the todo list exists AND the model makes its first `edit`/`write` (the "todo gate"), the session switches to the fast target model and a verification checklist is steered in. The plan nudge is scrubbed from the LLM context at the switch: the fast model inherits the plan, not the nudge.
+4. **Codex recovery** — if the Codex backend rejects the first request after the switch because the cached WebSocket is still bound to the previous model ("model ... is not enabled"), prewalk recovers with one automatic continuation, so the switch is seamless.
 
 `bash` is deliberately **not** a trigger tool (it doubles as exploration), and the `todo` call itself is deliberately **not** a trigger (firing there would hand the fast model the whole implementation cold).
 
